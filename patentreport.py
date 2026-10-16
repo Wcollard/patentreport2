@@ -73,6 +73,32 @@ def get_patent_details(google_url: str):
         return f"Error: {e}", "", "", "", ""
 
 
+def normalize_patent_number(number: str) -> str:
+    """Normalize the user input for patent searching.
+
+    Rules:
+    - Strip spaces and convert to uppercase
+    - Remove any non-alphanumeric characters
+    - If the value is numeric-only or starts with a single-letter prefix followed by digits,
+      prefix with US so inputs like 4123456 -> US4123456 and D123456 -> USD123456
+    - Keep existing country prefixes like EP, WO, CN, etc.
+    """
+    cleaned = re.sub(r"[^A-Z0-9]", "", number.strip().upper())
+    if not cleaned:
+        return ""
+
+    if cleaned.startswith("US"):
+        return cleaned
+
+    if re.match(r"^[0-9]+$", cleaned):
+        return "US" + cleaned
+
+    if re.match(r"^[A-Z][0-9]+$", cleaned):
+        return "US" + cleaned
+
+    return cleaned
+
+
 def export_to_excel():
     """
     Read patent numbers from the text box, fetch details, and
@@ -85,16 +111,13 @@ def export_to_excel():
         )
         return
 
-    # Build Downloads path + timestamped filename
     downloads_path = get_downloads_path()
     now = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = os.path.join(downloads_path, f"patent_export_{now}.xlsx")
 
-    # Create workbook and worksheet
     workbook = xlsxwriter.Workbook(filename)
     worksheet = workbook.add_worksheet()
 
-    # Formats
     header_format = workbook.add_format(
         {
             "bold": True,
@@ -120,12 +143,10 @@ def export_to_excel():
         }
     )
 
-    # Column widths
     column_widths = [20, 20, 20, 25, 15, 15, 15, 15, 70, 50]
     for col, width in enumerate(column_widths):
         worksheet.set_column(col, col, width)
 
-    # Headers
     headers = [
         "Ref No.",
         "Inventor",
@@ -140,21 +161,11 @@ def export_to_excel():
     ]
     worksheet.write_row(0, 0, headers, header_format)
 
-    # Data rows
     row = 1
     for number in patent_numbers:
-        # Normalize, remove non-alphanumeric characters and uppercase.
-        # Keep the letter D if present and normalize to uppercase so 'd123' -> 'D123'
-        cleaned_number = re.sub(r'[^A-Z0-9]', '', number.strip().upper())
-        if not cleaned_number:
+        search_number = normalize_patent_number(number)
+        if not search_number:
             continue
-
-        # If the cleaned number starts with a digit (no leading letters),
-        # prefix it with 'US' for searching (e.g. 4123456 -> US4123456)
-        if re.match(r'^[0-9]', cleaned_number):
-            search_number = 'US' + cleaned_number
-        else:
-            search_number = cleaned_number
 
         google_url = f"https://patents.google.com/patent/{search_number}/en"
         espacenet_url = f"https://worldwide.espacenet.com/patent/search?q={search_number}"
@@ -163,13 +174,11 @@ def export_to_excel():
         if uspto_number.startswith("US"):
             uspto_number = uspto_number[2:]
         uspto_url = f"https://ppubs.uspto.gov/pubwebapp/external.html?q={uspto_number}.pn."
-        uspto_pdf_link = f"https://image-ppubs.uspto.gov/dirsearch-public/print/downloadPdf/{uspto_number}"
 
         pdf_link, title, inventor, publication_date, abstract = get_patent_details(
             google_url
         )
 
-        # Write data (use the search_number so the sheet shows what was searched)
         worksheet.write(row, 0, search_number)
         worksheet.write(row, 1, inventor)
         worksheet.write(row, 2, title, abstract_format)
@@ -179,11 +188,10 @@ def export_to_excel():
         worksheet.write_url(row, 6, espacenet_url, link_format, string=search_number)
         worksheet.write_url(row, 7, uspto_url, link_format, string=search_number)
         worksheet.write(row, 8, abstract, abstract_format)
-        worksheet.write(row, 9, "")  # NOTES column
+        worksheet.write(row, 9, "")
 
-        # Rough row height based on abstract length
         text_lines = len(abstract) // 70 + abstract.count("\n") + 1
-        row_height = min(text_lines * 15, 409)  # 409 = Excel max row height
+        row_height = min(text_lines * 15, 409)
         worksheet.set_row(row, row_height)
 
         row += 1
@@ -195,7 +203,6 @@ def export_to_excel():
     )
 
 
-# Tkinter UI
 root = tk.Tk()
 root.title("Patent Exporter")
 
