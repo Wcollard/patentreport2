@@ -142,13 +142,17 @@ def export_to_excel():
     # Data rows
     row = 1
     for number in patent_numbers:
-        cleaned_number = number.strip()
+        # Keep the letter D if present and normalize to uppercase so 'd123' -> 'D123'
+        cleaned_number = number.strip().upper()
         if not cleaned_number:
             continue
 
         google_url = f"https://patents.google.com/patent/{cleaned_number}/en"
         espacenet_url = f"https://worldwide.espacenet.com/patent/search?q={cleaned_number}"
-        uspto_number = cleaned_number.replace("US", "")
+
+        uspto_number = cleaned_number
+        if uspto_number.startswith("US"):
+            uspto_number = uspto_number[2:]
         uspto_url = f"https://ppubs.uspto.gov/pubwebapp/external.html?q={uspto_number}.pn."
         uspto_pdf_link = f"https://image-ppubs.uspto.gov/dirsearch-public/print/downloadPdf/{uspto_number}"
 
