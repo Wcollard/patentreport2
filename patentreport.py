@@ -1,4 +1,5 @@
 import os
+import re
 import tkinter as tk
 from tkinter import messagebox
 import xlsxwriter
@@ -142,15 +143,23 @@ def export_to_excel():
     # Data rows
     row = 1
     for number in patent_numbers:
+        # Normalize, remove non-alphanumeric characters and uppercase.
         # Keep the letter D if present and normalize to uppercase so 'd123' -> 'D123'
-        cleaned_number = number.strip().upper()
+        cleaned_number = re.sub(r'[^A-Z0-9]', '', number.strip().upper())
         if not cleaned_number:
             continue
 
-        google_url = f"https://patents.google.com/patent/{cleaned_number}/en"
-        espacenet_url = f"https://worldwide.espacenet.com/patent/search?q={cleaned_number}"
+        # If the cleaned number starts with a digit (no leading letters),
+        # prefix it with 'US' for searching (e.g. 4123456 -> US4123456)
+        if re.match(r'^[0-9]', cleaned_number):
+            search_number = 'US' + cleaned_number
+        else:
+            search_number = cleaned_number
 
-        uspto_number = cleaned_number
+        google_url = f"https://patents.google.com/patent/{search_number}/en"
+        espacenet_url = f"https://worldwide.espacenet.com/patent/search?q={search_number}"
+
+        uspto_number = search_number
         if uspto_number.startswith("US"):
             uspto_number = uspto_number[2:]
         uspto_url = f"https://ppubs.uspto.gov/pubwebapp/external.html?q={uspto_number}.pn."
@@ -160,15 +169,15 @@ def export_to_excel():
             google_url
         )
 
-        # Write data
-        worksheet.write(row, 0, cleaned_number)
+        # Write data (use the search_number so the sheet shows what was searched)
+        worksheet.write(row, 0, search_number)
         worksheet.write(row, 1, inventor)
         worksheet.write(row, 2, title, abstract_format)
         worksheet.write(row, 3, publication_date)
         worksheet.write(row, 4, pdf_link)
-        worksheet.write_url(row, 5, google_url, link_format, string=cleaned_number)
-        worksheet.write_url(row, 6, espacenet_url, link_format, string=cleaned_number)
-        worksheet.write_url(row, 7, uspto_url, link_format, string=cleaned_number)
+        worksheet.write_url(row, 5, google_url, link_format, string=search_number)
+        worksheet.write_url(row, 6, espacenet_url, link_format, string=search_number)
+        worksheet.write_url(row, 7, uspto_url, link_format, string=search_number)
         worksheet.write(row, 8, abstract, abstract_format)
         worksheet.write(row, 9, "")  # NOTES column
 
